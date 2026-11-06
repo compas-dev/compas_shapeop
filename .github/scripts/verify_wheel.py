@@ -15,11 +15,16 @@ def main() -> None:
     filename_parts = args.wheel.name.removesuffix(".whl").split("-")
     if len(filename_parts) != 5:
         raise SystemExit(f"Wheel filename does not have five tag fields: {args.wheel.name}")
-    distribution, version, python_tag, abi_tag, platform_tag = filename_parts
-    if distribution != "compas_shapeop" or python_tag != "cp312" or abi_tag != "abi3" or not platform_tag:
+    distribution, version, python_component, abi_component, platform_component = filename_parts
+    python_tags = python_component.split(".")
+    abi_tags = abi_component.split(".")
+    platform_tags = platform_component.split(".")
+    if distribution != "compas_shapeop" or set(python_tags) != {"cp312"} or set(abi_tags) != {"abi3"} or not all(platform_tags):
         raise SystemExit(f"Wheel filename is not compas_shapeop-*-cp312-abi3-*: {args.wheel.name}")
-    if platform_tag == "any":
+    if "any" in platform_tags:
         raise SystemExit("Native wheel filename platform tag must not be 'any'")
+
+    expected_tags = {f"{python_tag}-{abi_tag}-{platform_tag}" for python_tag in python_tags for abi_tag in abi_tags for platform_tag in platform_tags}
 
     with zipfile.ZipFile(args.wheel) as archive:
         names = set(archive.namelist())
@@ -30,10 +35,11 @@ def main() -> None:
             raise SystemExit("Wheel must contain exactly one WHEEL file and one METADATA file")
 
         wheel_metadata = Parser().parsestr(archive.read(wheel_metadata_files[0]).decode())
-        tags = wheel_metadata.get_all("Tag", [])
-        expected_tag = f"{python_tag}-{abi_tag}-{platform_tag}"
-        if not tags or any(tag != expected_tag for tag in tags):
-            raise SystemExit(f"WHEEL tags must all exactly match the filename tag {expected_tag}: {tags}")
+        tags = set(wheel_metadata.get_all("Tag", []))
+        if tags != expected_tags:
+            missing = sorted(expected_tags - tags)
+            extra = sorted(tags - expected_tags)
+            raise SystemExit(f"WHEEL tag set does not match the expanded filename tags; missing={missing}, extra={extra}")
 
         package_metadata = Parser().parsestr(archive.read(package_metadata_files[0]).decode())
 

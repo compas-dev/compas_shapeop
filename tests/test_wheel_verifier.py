@@ -12,13 +12,14 @@ def make_wheel(
     tmp_path: Path,
     *,
     platform_tag: str = "macosx_11_0_arm64",
-    wheel_tag: str | None = None,
+    wheel_tags: tuple[str, ...] | None = None,
     requires_python: str = ">=3.12",
     requires_numpy: bool = True,
 ) -> Path:
     wheel = tmp_path / f"compas_shapeop-0.1.2-cp312-abi3-{platform_tag}.whl"
     dist_info = "compas_shapeop-0.1.2.dist-info"
-    wheel_tag = wheel_tag or f"cp312-abi3-{platform_tag}"
+    wheel_tags = wheel_tags or tuple(f"cp312-abi3-{platform}" for platform in platform_tag.split("."))
+    wheel_tag_headers = "".join(f"Tag: {tag}\n" for tag in wheel_tags)
     requires_dist = "Requires-Dist: compas<4,>=3\n"
     if requires_numpy:
         requires_dist += "Requires-Dist: numpy>=1.26\n"
@@ -32,7 +33,7 @@ def make_wheel(
         archive.writestr(f"{dist_info}/licenses/THIRD_PARTY_NOTICES.md", "")
         archive.writestr(
             f"{dist_info}/WHEEL",
-            f"Wheel-Version: 1.0\nRoot-Is-Purelib: false\nTag: {wheel_tag}\n",
+            f"Wheel-Version: 1.0\nRoot-Is-Purelib: false\n{wheel_tag_headers}",
         )
         archive.writestr(
             f"{dist_info}/METADATA",
@@ -57,17 +58,54 @@ def test_wheel_verifier_accepts_expected_contract(tmp_path: Path):
 
 
 def test_wheel_verifier_rejects_inconsistent_wheel_tag(tmp_path: Path):
-    result = run_verifier(make_wheel(tmp_path, wheel_tag="cp313-abi3-macosx_11_0_arm64"))
+    result = run_verifier(make_wheel(tmp_path, wheel_tags=("cp313-abi3-macosx_11_0_arm64",)))
 
     assert result.returncode != 0
-    assert "exactly match" in result.stderr
+    assert "tag set" in result.stderr
 
 
 def test_wheel_verifier_rejects_platform_tag_mismatch(tmp_path: Path):
-    result = run_verifier(make_wheel(tmp_path, wheel_tag="cp312-abi3-manylinux_2_28_x86_64"))
+    result = run_verifier(make_wheel(tmp_path, wheel_tags=("cp312-abi3-manylinux_2_28_x86_64",)))
 
     assert result.returncode != 0
-    assert "exactly match" in result.stderr
+    assert "tag set" in result.stderr
+
+
+def test_wheel_verifier_accepts_compressed_platform_tags(tmp_path: Path):
+    platform_tag = "manylinux_2_27_x86_64.manylinux_2_28_x86_64"
+
+    result = run_verifier(make_wheel(tmp_path, platform_tag=platform_tag))
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_wheel_verifier_rejects_missing_compressed_tag(tmp_path: Path):
+    platform_tag = "manylinux_2_27_x86_64.manylinux_2_28_x86_64"
+    result = run_verifier(
+        make_wheel(
+            tmp_path,
+            platform_tag=platform_tag,
+            wheel_tags=("cp312-abi3-manylinux_2_28_x86_64",),
+        )
+    )
+
+    assert result.returncode != 0
+    assert "missing=" in result.stderr
+
+
+def test_wheel_verifier_rejects_extra_tag(tmp_path: Path):
+    result = run_verifier(
+        make_wheel(
+            tmp_path,
+            wheel_tags=(
+                "cp312-abi3-macosx_11_0_arm64",
+                "cp312-abi3-macosx_12_0_arm64",
+            ),
+        )
+    )
+
+    assert result.returncode != 0
+    assert "extra=" in result.stderr
 
 
 def test_wheel_verifier_rejects_any_platform_for_native_wheel(tmp_path: Path):

@@ -101,7 +101,7 @@ build-verbosity = 3
 build-frontend = "pip"
 manylinux-x86_64-image = "manylinux_2_28"
 skip = ["*_i686", "*-musllinux_*", "*-win32", "pp*"]
-test-requires = ["compas>=3,<4", "numpy>=1.26", "pytest>=8"]
+test-requires = ["numpy>=1.26", "pytest>=8"]
 test-command = "pytest {project}/tests"
 macos.environment.MACOSX_DEPLOYMENT_TARGET = "11.0"
 macos.archs = ["x86_64", "arm64"]

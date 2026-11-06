@@ -18,5 +18,7 @@ def test_cmake_minimum_is_consistent():
 
 def test_cibuildwheel_uses_pip_frontend():
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    cibuildwheel = pyproject["tool"]["cibuildwheel"]
 
-    assert pyproject["tool"]["cibuildwheel"]["build-frontend"] == "pip"
+    assert cibuildwheel["build-frontend"] == "pip"
+    assert cibuildwheel["test-requires"] == ["numpy>=1.26", "pytest>=8"]
