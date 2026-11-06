@@ -98,7 +98,7 @@ input = "src/compas_shapeop/__init__.py"
 [tool.cibuildwheel]
 build = ["cp312-*"]
 build-verbosity = 3
-build-frontend = "build[uv]"
+build-frontend = "pip"
 manylinux-x86_64-image = "manylinux_2_28"
 skip = ["*_i686", "*-musllinux_*", "*-win32", "pp*"]
 test-requires = ["compas>=3,<4", "numpy>=1.26", "pytest>=8"]

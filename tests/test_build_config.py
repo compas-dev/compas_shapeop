@@ -14,3 +14,9 @@ def test_cmake_minimum_is_consistent():
     assert f"cmake_minimum_required(VERSION {CMAKE_MINIMUM}" in cmake_lists
     assert pyproject["tool"]["scikit-build"]["cmake"]["version"] == f">={CMAKE_MINIMUM}"
     assert f"cmake>={CMAKE_MINIMUM}" in pyproject["dependency-groups"]["build"]
+
+
+def test_cibuildwheel_uses_pip_frontend():
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
+
+    assert pyproject["tool"]["cibuildwheel"]["build-frontend"] == "pip"
