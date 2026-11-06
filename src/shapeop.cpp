@@ -409,7 +409,7 @@ public:
 
     /**
      * @brief Add bending constraint between two neighboring triangles
-     * @param indices Vector of 4 vertex indices in specific order (id2, id0, id1, id3)
+     * @param indices Vector of 4 vertex indices with shared-edge vertices first (id0, id1, id2, id3)
      * @param weight Weight of the constraint
      * @param min_range Minimum range factor (default: 1.0)
      * @param max_range Maximum range factor (default: 1.0)
@@ -426,9 +426,9 @@ public:
             throw std::runtime_error("Bending constraint requires exactly 4 vertices");
         }
         
-        // Vertices must be in specific order for bending constraint:
-        // id2 connects to id0 and id1, id3 connects to id0 and id1
-        // Order: id2, id0, id1, id3 (as shown in the diagram)
+        // The shared-edge vertices come first. The opposite vertices id2 and
+        // id3 complete the two neighboring triangles.
+        // Order: id0, id1, id2, id3.
         
         // Create the bending constraint
         auto constraint = std::make_shared<ShapeOp::BendingConstraint>(

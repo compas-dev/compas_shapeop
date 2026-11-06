@@ -250,7 +250,8 @@ class SHAPEOP_API BendingConstraint : public Constraint {
       |       \   /       |
       |        id3        |
      </pre>
-    \param idI are four indices of the vertices of the tetrahedron
+    \param idI are four indices ordered [id0, id1, id2, id3], with the
+    shared-edge vertices id0 and id1 first
     \param weight The weight of the constraint to be added relative to the other constraints.
     \param positions The positions of all the n vertices stacked in a 3 by n matrix.
     \param rangeMin The factor to determine the minimal bend: rangeMin*target_bend.

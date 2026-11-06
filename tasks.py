@@ -32,6 +32,7 @@ def typecheck(context):
 def docs(context):
     """Build the documentation in strict mode."""
     context.run("python -m mkdocs build --strict")
+    context.run("python .github/scripts/verify_docs.py site")
 
 
 @task

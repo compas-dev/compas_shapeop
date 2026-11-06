@@ -65,6 +65,7 @@ Forum = "https://forum.compas-framework.org/"
 
 [tool.uv.sources]
 compas = { git = "https://github.com/compas-dev/compas.git", rev = "3c1a2e8e0e5c4c14292ecf4bb38c82e5b977273e" }
+compas-viewer = { git = "https://github.com/compas-dev/compas_viewer.git", rev = "cf5a5195bda840a511319d6b7201978af68c15e3" }
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -82,7 +83,6 @@ sdist.include = [
     "docs/**",
     "examples/**",
     "tests/**",
-    "typings/**",
     "src/shapeop/**",
     "src/compas.h",
     "src/shapeop.cpp",
@@ -143,11 +143,11 @@ order-by-type = true
 [tool.ruff.format]
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
+exclude = ["docs/**/*.md"]
 
 [tool.pyright]
 include = ["src/compas_shapeop", "tests", "examples", "docs/examples"]
 exclude = ["build", "dist", "external"]
-stubPath = "typings"
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 reportMissingModuleSource = false

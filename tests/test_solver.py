@@ -35,31 +35,6 @@ def test_first_constraint_reports_success():
     assert solver.add_closeness_constraint(0)
 
 
-def test_points_reassignment_resets_solver_and_preserves_exported_view():
-    solver = Solver()
-    solver.points = np.array([[0.0, 0.0, 0.0]])
-    solver.add_closeness_constraint(0)
-    solver.init()
-    previous = solver.points
-    assert previous is not None
-    snapshot = previous.copy()
-
-    solver.points = np.array([[1.0, 2.0, 3.0], [2.0, 2.0, 3.0]])
-
-    assert solver.points is None
-    assert not solver.is_initialized
-    np.testing.assert_array_equal(previous, snapshot)
-
-    solver.add_closeness_constraint(0)
-    solver.add_closeness_constraint(1)
-    solver.init()
-
-    current = solver.points
-    assert current is not None
-    np.testing.assert_array_equal(current, [[1.0, 2.0, 3.0], [2.0, 2.0, 3.0]])
-    assert not np.shares_memory(previous, current)
-
-
 def test_shape_constraints_are_bound_and_solve():
     points = np.array([[0.0, 0.0, 0.0], [1.1, 0.0, 0.0], [1.0, 0.8, 0.0], [0.0, 1.0, 0.0]])
 

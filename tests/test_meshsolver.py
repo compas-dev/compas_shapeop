@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import numpy as np
 
 from compas.datastructures import Mesh
@@ -8,6 +10,7 @@ class RecordingMeshSolver(MeshSolver):
     def __init__(self, mesh: Mesh) -> None:
         super().__init__(mesh)
         self.edge_constraints: list[tuple[int, int, float, float, float]] = []
+        self.bending_constraints: list[tuple[list[int], float, float, float]] = []
 
     def add_edge_strain_constraint(
         self,
@@ -18,6 +21,16 @@ class RecordingMeshSolver(MeshSolver):
         max_range: float = 1.1,
     ) -> bool:
         self.edge_constraints.append((start_vertex, end_vertex, weight, min_range, max_range))
+        return True
+
+    def add_bending_constraint(
+        self,
+        indices: Sequence[int],
+        weight: float = 1.0,
+        min_range: float = 1.0,
+        max_range: float = 1.0,
+    ) -> bool:
+        self.bending_constraints.append((list(indices), weight, min_range, max_range))
         return True
 
 
@@ -88,3 +101,19 @@ def test_face_diagonal_options_are_forwarded():
         (0, 2, 4.0, 0.8, 1.2),
         (1, 3, 4.0, 0.8, 1.2),
     ]
+
+
+def test_nonflat_bending_uses_shared_edge_vertices_first():
+    mesh = Mesh()
+    mesh.add_vertex(key=10, x=0.0, y=0.0, z=0.0)
+    mesh.add_vertex(key=20, x=1.0, y=0.0, z=0.0)
+    mesh.add_vertex(key=30, x=0.0, y=1.0, z=0.0)
+    mesh.add_vertex(key=40, x=0.0, y=0.0, z=1.0)
+    mesh.add_face([10, 20, 30])
+    mesh.add_face([20, 10, 40])
+    solver = RecordingMeshSolver(mesh)
+
+    statuses = solver.constrain_triface_bending(weight=2.0, min_range=0.8, max_range=1.2)
+
+    assert statuses == [True]
+    assert solver.bending_constraints == [([0, 1, 2, 3], 2.0, 0.8, 1.2)]

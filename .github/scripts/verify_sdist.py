@@ -18,6 +18,7 @@ def main() -> None:
 
     required = (
         "CMakeLists.txt",
+        ".github/scripts/verify_docs.py",
         "LICENSE",
         "LICENSE.shapeop",
         "REFERENCES.md",
@@ -26,7 +27,6 @@ def main() -> None:
         "docs/index.md",
         "tests/test_solver.py",
         "src/shapeop/Constraint.cpp",
-        "typings/compas_viewer/__init__.pyi",
         "src/shapeop/Solver.cpp",
         "src/shapeop.cpp",
         "src/compas_shapeop/_shapeop.pyi",

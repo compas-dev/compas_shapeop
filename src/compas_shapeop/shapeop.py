@@ -42,10 +42,7 @@ class Solver:
     Attributes
     ----------
     points : numpy.ndarray
-        Direct reference to the initialized solver's points matrix in shape
-        `(n, 3)`, or `None` before initialization. Assigning new points resets
-        the native solver, including its constraints and forces, and requires
-        another call to `init()`.
+        Direct reference to the solver's points matrix in shape `(n, 3)`.
     """
 
     def __init__(self) -> None:
@@ -56,8 +53,6 @@ class Solver:
         """
         self._solver = SolverWrapper()
         self._points: NDArray[np.float64] | None = None
-        self._retired_solvers: list[SolverWrapper] = []
-        self.is_initialized: bool = False
 
     @property
     def points(self) -> NDArray[np.float64] | None:
@@ -93,16 +88,8 @@ class Solver:
 
         # Convert to (3, n) Fortran-ordered array for efficient transfer to C++
         fortran_points = np.asfortranarray(points_array.T)
-
-        # Point count changes can invalidate constraints, forces, and exported
-        # views. A fresh wrapper gives reassignment one explicit lifecycle: add
-        # constraints and forces again, then initialize again.
-        if self._points is not None:
-            self._retired_solvers.append(self._solver)
-        self._solver = SolverWrapper()
+        # Use the optimized array-based method
         self._solver.set_points(fortran_points)
-        self._points = None
-        self.is_initialized = False
 
     def init(self, dynamic: bool = False, masses: float = 1.0, damping: float = 1.0, timestep: float = 1.0) -> None:
         """Initialize the solver with simulation parameters.
@@ -123,7 +110,6 @@ class Solver:
         # Set up the direct view after initialization when memory is fully prepared
         if result:
             self._points = self._solver.get_points().T
-            self.is_initialized = True
         else:
             print("Failed to initialize solver")
 
@@ -302,7 +288,8 @@ class Solver:
         Parameters
         ----------
         indices : list
-            List of 4 vertex indices in the specific order [id2, id0, id1, id3].
+            Four vertex indices ordered `[id0, id1, id2, id3]`, with the two
+            shared-edge vertices first.
         weight : float, optional
             Weight of the constraint. Default is 1.0.
         min_range : float, optional

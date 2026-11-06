@@ -27,6 +27,7 @@ class MeshSolver(Solver):
     def __init__(self, mesh: Mesh) -> None:
         super().__init__()
         self.mesh: Mesh = mesh
+        self.is_initialized: bool = False
         self._vertex_keys = list(mesh.vertices())
         self._vertex_index = {vertex: index for index, vertex in enumerate(self._vertex_keys)}
         self.points = [mesh.vertex_coordinates(vertex) for vertex in self._vertex_keys]
@@ -265,8 +266,8 @@ class MeshSolver(Solver):
                     id3 = vertex
                     break
 
-            # Now we need to order them as [id2, id0, id1, id3]
-            # where id0-id1is the shared edge
+            # The shared-edge vertices come first, followed by the opposite
+            # vertex of each adjacent triangle: [id0, id1, id2, id3].
             if id2 is not None and id3 is not None:
                 constraint_ids.append(self.add_bending_constraint(self._solver_indices([u, v, id2, id3]), weight, min_range, max_range))
 
