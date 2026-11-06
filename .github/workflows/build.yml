@@ -28,8 +28,8 @@ jobs:
           extras: ""
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run pyright --pythonpath "$(command -v python)"
-      - run: uv run pyright --pythonpath "$(command -v python)" --verifytypes compas_shapeop --ignoreexternal
+      - run: uv run pyright
+      - run: uv run pyright --verifytypes compas_shapeop --ignoreexternal
       - run: uv run pytest
 
   wheels:
