@@ -13,6 +13,7 @@ def make_wheel(
     *,
     platform_tag: str = "macosx_11_0_arm64",
     wheel_tags: tuple[str, ...] | None = None,
+    native_extension: str = "_shapeop.abi3.so",
     requires_python: str = ">=3.12",
     requires_numpy: bool = True,
 ) -> Path:
@@ -27,7 +28,7 @@ def make_wheel(
     with zipfile.ZipFile(wheel, "w") as archive:
         archive.writestr("compas_shapeop/py.typed", "")
         archive.writestr("compas_shapeop/_shapeop.pyi", "")
-        archive.writestr("compas_shapeop/_shapeop.abi3.so", "")
+        archive.writestr(f"compas_shapeop/{native_extension}", "")
         archive.writestr(f"{dist_info}/licenses/LICENSE", "")
         archive.writestr(f"{dist_info}/licenses/LICENSE.shapeop", "")
         archive.writestr(f"{dist_info}/licenses/THIRD_PARTY_NOTICES.md", "")
@@ -77,6 +78,33 @@ def test_wheel_verifier_accepts_compressed_platform_tags(tmp_path: Path):
     result = run_verifier(make_wheel(tmp_path, platform_tag=platform_tag))
 
     assert result.returncode == 0, result.stderr
+
+
+def test_wheel_verifier_accepts_windows_pyd_for_abi3_wheel(tmp_path: Path):
+    result = run_verifier(make_wheel(tmp_path, platform_tag="win_amd64", native_extension="_shapeop.pyd"))
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_wheel_verifier_rejects_pyd_for_posix_wheel(tmp_path: Path):
+    result = run_verifier(make_wheel(tmp_path, native_extension="_shapeop.pyd"))
+
+    assert result.returncode != 0
+    assert "requires a Windows wheel" in result.stderr
+
+
+def test_wheel_verifier_rejects_posix_extension_for_windows_wheel(tmp_path: Path):
+    result = run_verifier(make_wheel(tmp_path, platform_tag="win_amd64"))
+
+    assert result.returncode != 0
+    assert "Windows wheel must contain a .pyd" in result.stderr
+
+
+def test_wheel_verifier_rejects_posix_extension_without_abi3_suffix(tmp_path: Path):
+    result = run_verifier(make_wheel(tmp_path, native_extension="_shapeop.so"))
+
+    assert result.returncode != 0
+    assert "does not use an abi3 import suffix" in result.stderr
 
 
 def test_wheel_verifier_rejects_missing_compressed_tag(tmp_path: Path):

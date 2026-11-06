@@ -70,8 +70,15 @@ def main() -> None:
     native = [name for name in names if "compas_shapeop/_shapeop" in name and name.endswith((".so", ".pyd", ".dylib"))]
     if len(native) != 1:
         raise SystemExit(f"Expected exactly one private native extension, found: {native}")
-    if ".abi3" not in native[0]:
-        raise SystemExit(f"Native extension does not use an abi3 import suffix: {native[0]}")
+    native_extension = native[0]
+    windows_platform = all(platform_tag.startswith("win") for platform_tag in platform_tags)
+    if native_extension.endswith(".pyd"):
+        if not windows_platform:
+            raise SystemExit(f"A .pyd native extension requires a Windows wheel platform tag: {native_extension}")
+    elif windows_platform:
+        raise SystemExit(f"A Windows wheel must contain a .pyd native extension: {native_extension}")
+    elif ".abi3" not in native_extension:
+        raise SystemExit(f"POSIX native extension does not use an abi3 import suffix: {native_extension}")
 
     forbidden = [name for name in names if "/shapeop/" in name or "/eigen/" in name or name.startswith("include/eigen3/") or name.startswith("share/pkgconfig/eigen3")]
     if forbidden:
