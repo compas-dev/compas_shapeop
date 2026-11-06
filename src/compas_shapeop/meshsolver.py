@@ -116,17 +116,17 @@ class MeshSolver(Solver):
         Parameters
         ----------
         min_range : float, optional
-            Minimum allowed relative length. Default is 0.9.
+            Minimum allowed relative length. Default is 0.99.
         max_range : float, optional
-            Maximum allowed relative length. Default is 1.1.
+            Maximum allowed relative length. Default is 1.01.
         shrink_factor : float, optional
             Target length as a ratio of the original length. The accepted range
-            is `shrink_factor - 0.05` to `shrink_factor + 0.05`. A value of
-            `0` disables shrinking and uses `min_range` and `max_range`.
+            is `shrink_factor - 0.05` to `shrink_factor + 0.05`. Default is
+            `0`, which disables shrinking and uses `min_range` and `max_range`.
         exclude_edges : list, optional
             List of edges to exclude from constraints. Default is None.
         weight : float, optional
-            Weight of the constraints. Default is 1.0.
+            Weight of the constraints. Default is 10.0.
 
         Returns
         -------
@@ -153,11 +153,11 @@ class MeshSolver(Solver):
         Parameters
         ----------
         min_range : float, optional
-            Minimum allowed relative length. Default is 0.9.
+            Minimum allowed relative length. Default is 0.99.
         max_range : float, optional
-            Maximum allowed relative length. Default is 1.1.
+            Maximum allowed relative length. Default is 1.01.
         weight : float, optional
-            Weight of the constraints. Default is 1.0.
+            Weight of the constraints. Default is 10.0.
 
         Returns
         -------
@@ -207,7 +207,7 @@ class MeshSolver(Solver):
         Parameters
         ----------
         weight : float, optional
-            Weight of the constraints. Default is 1e5.
+            Weight of the constraints. Default is 1e3.
 
         Returns
         -------
@@ -341,7 +341,7 @@ class MeshSolver(Solver):
         Parameters
         ----------
         fz : float, optional
-            Z component of the gravity force vector. Default is -0.001.
+            Z component of the gravity force vector. Default is 0.01.
 
         Returns
         -------
@@ -356,7 +356,7 @@ class MeshSolver(Solver):
         Parameters
         ----------
         weight : float, optional
-            Weight of the force. Default is 1e5.
+            Weight of the force. Default is 10.0.
 
         Returns
         -------

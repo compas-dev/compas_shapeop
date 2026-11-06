@@ -8,9 +8,17 @@ ROOT = Path(__file__).parents[1]
 VERIFIER = ROOT / ".github" / "scripts" / "verify_wheel.py"
 
 
-def make_wheel(tmp_path: Path, *, tag: str = "cp312-abi3-any", requires_python: str = ">=3.12", requires_numpy: bool = True) -> Path:
-    wheel = tmp_path / "compas_shapeop-0.1.2-cp312-abi3-any.whl"
+def make_wheel(
+    tmp_path: Path,
+    *,
+    platform_tag: str = "macosx_11_0_arm64",
+    wheel_tag: str | None = None,
+    requires_python: str = ">=3.12",
+    requires_numpy: bool = True,
+) -> Path:
+    wheel = tmp_path / f"compas_shapeop-0.1.2-cp312-abi3-{platform_tag}.whl"
     dist_info = "compas_shapeop-0.1.2.dist-info"
+    wheel_tag = wheel_tag or f"cp312-abi3-{platform_tag}"
     requires_dist = "Requires-Dist: compas<4,>=3\n"
     if requires_numpy:
         requires_dist += "Requires-Dist: numpy>=1.26\n"
@@ -24,7 +32,7 @@ def make_wheel(tmp_path: Path, *, tag: str = "cp312-abi3-any", requires_python: 
         archive.writestr(f"{dist_info}/licenses/THIRD_PARTY_NOTICES.md", "")
         archive.writestr(
             f"{dist_info}/WHEEL",
-            f"Wheel-Version: 1.0\nRoot-Is-Purelib: false\nTag: {tag}\n",
+            f"Wheel-Version: 1.0\nRoot-Is-Purelib: false\nTag: {wheel_tag}\n",
         )
         archive.writestr(
             f"{dist_info}/METADATA",
@@ -49,15 +57,29 @@ def test_wheel_verifier_accepts_expected_contract(tmp_path: Path):
 
 
 def test_wheel_verifier_rejects_inconsistent_wheel_tag(tmp_path: Path):
-    result = run_verifier(make_wheel(tmp_path, tag="cp313-abi3-any"))
+    result = run_verifier(make_wheel(tmp_path, wheel_tag="cp313-abi3-macosx_11_0_arm64"))
 
     assert result.returncode != 0
-    assert "cp312-abi3" in result.stderr
+    assert "exactly match" in result.stderr
+
+
+def test_wheel_verifier_rejects_platform_tag_mismatch(tmp_path: Path):
+    result = run_verifier(make_wheel(tmp_path, wheel_tag="cp312-abi3-manylinux_2_28_x86_64"))
+
+    assert result.returncode != 0
+    assert "exactly match" in result.stderr
+
+
+def test_wheel_verifier_rejects_any_platform_for_native_wheel(tmp_path: Path):
+    result = run_verifier(make_wheel(tmp_path, platform_tag="any"))
+
+    assert result.returncode != 0
+    assert "must not be 'any'" in result.stderr
 
 
 def test_wheel_verifier_rejects_incorrect_filename_tag(tmp_path: Path):
     wheel = make_wheel(tmp_path)
-    incorrect = wheel.with_name("compas_shapeop-0.1.2-cp313-abi3-any.whl")
+    incorrect = wheel.with_name("compas_shapeop-0.1.2-cp313-abi3-macosx_11_0_arm64.whl")
     wheel.rename(incorrect)
 
     result = run_verifier(incorrect)

@@ -18,6 +18,8 @@ def main() -> None:
     distribution, version, python_tag, abi_tag, platform_tag = filename_parts
     if distribution != "compas_shapeop" or python_tag != "cp312" or abi_tag != "abi3" or not platform_tag:
         raise SystemExit(f"Wheel filename is not compas_shapeop-*-cp312-abi3-*: {args.wheel.name}")
+    if platform_tag == "any":
+        raise SystemExit("Native wheel filename platform tag must not be 'any'")
 
     with zipfile.ZipFile(args.wheel) as archive:
         names = set(archive.namelist())
@@ -29,9 +31,9 @@ def main() -> None:
 
         wheel_metadata = Parser().parsestr(archive.read(wheel_metadata_files[0]).decode())
         tags = wheel_metadata.get_all("Tag", [])
-        expected_tag_prefix = f"{python_tag}-{abi_tag}-"
-        if not tags or any(not tag.startswith(expected_tag_prefix) for tag in tags):
-            raise SystemExit(f"WHEEL tags must all match {expected_tag_prefix}*: {tags}")
+        expected_tag = f"{python_tag}-{abi_tag}-{platform_tag}"
+        if not tags or any(tag != expected_tag for tag in tags):
+            raise SystemExit(f"WHEEL tags must all exactly match the filename tag {expected_tag}: {tags}")
 
         package_metadata = Parser().parsestr(archive.read(package_metadata_files[0]).decode())
 
