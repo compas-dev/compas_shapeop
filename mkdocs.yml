@@ -1,0 +1,40 @@
+site_name: COMPAS ShapeOp
+site_description: ShapeOp solvers for COMPAS
+site_url: https://compas-dev.github.io/compas_shapeop/
+repo_url: https://github.com/compas-dev/compas_shapeop
+strict: true
+
+theme:
+  name: material
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Tutorial: tutorial.md
+  - Examples:
+      - Solver: examples/solver.md
+  - API:
+      - Solver: reference/solver.md
+      - MeshSolver: reference/meshsolver.md
+  - Development: development.md
+  - References: references.md
+  - License: license.md
+  - Changelog: changelog.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: numpy
+            show_source: true
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.highlight
+  - pymdownx.snippets
+  - pymdownx.superfences

@@ -1,72 +1,177 @@
-name: build
+name: build-candidate
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
   pull_request:
-    branches:
-      - main
+    branches: [c3-upgrade, initiative/repository-modernisation]
+  push:
+    branches: [c3-upgrade, initiative/repository-modernisation]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shapeop-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  Build:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'docs-only') }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ["3.10"]
-
+  quality:
+    runs-on: ubuntu-latest
     steps:
-      - uses: compas-dev/compas-actions.build@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          invoke_lint: true
-          use_conda: true
-          check_import: true
-          python: ${{ matrix.python }}
-          
-  build_wheels:
-    name: Test wheel building on ${{ matrix.platform }}
+          persist-credentials: false
+      - uses: compas-dev/compas-actions/setup-python@5c64e6e2b576a1232d28fed47d9478ca8eb63b2d # v2 candidate
+        with:
+          python-version: "3.12"
+          dependency-groups: dev
+          extras: ""
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pyright --pythonpath "$(command -v python)"
+      - run: uv run pyright --pythonpath "$(command -v python)" --verifytypes compas_shapeop --ignoreexternal
+      - run: uv run pytest
+
+  wheels:
+    needs: quality
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            platform: manylinux
-          - os: macos-latest
-            platform: mac
+            platform: manylinux-x86_64
+            arch: x86_64
           - os: windows-latest
-            platform: windows
-
+            platform: windows-amd64
+            arch: AMD64
+          - os: macos-15-intel
+            platform: macos-x86_64
+            arch: x86_64
+          - os: macos-15
+            platform: macos-arm64
+            arch: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-
-      - name: Install cibuildwheel
-        run: pipx install cibuildwheel==2.23.1
-
-      - name: Build wheels
-        run: cibuildwheel --output-dir wheelhouse .
-
-      - uses: actions/upload-artifact@v4
+          persist-credentials: false
+      - uses: pypa/cibuildwheel@c923d83ad9c1bc00211c5041d0c3f73294ff88f6 # v2.23.3
+        env:
+          CIBW_ARCHS: ${{ matrix.arch }}
+          CIBW_BEFORE_TEST: >-
+            python -m pip install --force-reinstall --no-deps
+            "compas @ git+https://github.com/compas-dev/compas.git@3c1a2e8e0e5c4c14292ecf4bb38c82e5b977273e"
         with:
-          name: wheels-${{ matrix.platform }}
+          output-dir: wheelhouse
+      - name: Verify exact wheel composition
+        shell: bash
+        run: python .github/scripts/verify_wheel.py wheelhouse/*.whl
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wheel-${{ matrix.platform }}
           path: wheelhouse/*.whl
+          if-no-files-found: error
 
-  build_sdist:
-    name: Test source distribution
+  wheel-smoke:
+    needs: wheels
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-15-intel, macos-15]
+        python: ["3.12", "3.13", "3.14"]
+        include:
+          - os: ubuntu-latest
+            platform: manylinux-x86_64
+          - os: windows-latest
+            platform: windows-amd64
+          - os: macos-15-intel
+            platform: macos-x86_64
+          - os: macos-15
+            platform: macos-arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: wheel-${{ matrix.platform }}
+          path: wheelhouse
+      - name: Install the exact wheel
+        shell: bash
+        run: |
+          python -m pip install -c .github/constraints/compas-candidate.txt "compas>=3,<4" "numpy>=1.26"
+          python -m pip install --no-deps wheelhouse/*.whl
+      - name: Smoke-test outside the checkout
+        shell: bash
+        run: |
+          smoke_dir="$RUNNER_TEMP/compas-shapeop-smoke-${{ matrix.python }}"
+          mkdir -p "$smoke_dir"
+          cp .github/scripts/smoke_installed_wheel.py "$smoke_dir/"
+          cd "$smoke_dir"
+          python smoke_installed_wheel.py
+      - name: Verify installed typing contract
+        shell: bash
+        run: |
+          python -m pip install "pyright==1.1.414"
+          typing_dir="$RUNNER_TEMP/compas-shapeop-types-${{ matrix.python }}"
+          mkdir -p "$typing_dir"
+          cp tests/typing/*.py "$typing_dir/"
+          cd "$typing_dir"
+          python -m pyright --pythonpath "$(command -v python)" .
+
+  sdist:
+    needs: quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-
-      - name: Build SDist
-        run: pipx run build --sdist
-
-      - uses: actions/upload-artifact@v4
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build
+      - run: python -m build --sdist
+      - run: python .github/scripts/verify_sdist.py dist/*.tar.gz
+      - name: Build and smoke-test from a clean extracted sdist
+        shell: bash
+        run: |
+          python -m pip wheel --no-deps dist/*.tar.gz --wheel-dir sdist-wheelhouse
+          python .github/scripts/verify_wheel.py sdist-wheelhouse/*.whl
+          python -m pip install -c .github/constraints/compas-candidate.txt "compas>=3,<4" "numpy>=1.26"
+          python -m pip install --no-deps sdist-wheelhouse/*.whl
+          smoke_dir="$RUNNER_TEMP/compas-shapeop-sdist-smoke"
+          mkdir -p "$smoke_dir"
+          cp .github/scripts/smoke_installed_wheel.py "$smoke_dir/"
+          cd "$smoke_dir"
+          python smoke_installed_wheel.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sdist
           path: dist/*.tar.gz
+          if-no-files-found: error
+
+  candidate:
+    needs: [wheel-smoke, sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: "wheel-*"
+          path: candidate
+          merge-multiple: true
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sdist
+          path: candidate
+      - name: Record immutable candidate checksums
+        working-directory: candidate
+        run: sha256sum * > SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-distribution
+          path: candidate/*
+          if-no-files-found: error

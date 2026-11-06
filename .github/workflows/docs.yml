@@ -1,21 +1,29 @@
-name: docs
+name: docs-candidate
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*"
   pull_request:
-    branches:
-      - main
+    branches: [c3-upgrade, initiative/repository-modernisation]
+  push:
+    branches: [c3-upgrade, initiative/repository-modernisation]
+
+permissions:
+  contents: read
 
 jobs:
-  docs:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: compas-dev/compas-actions.docs@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          use_conda: true
-          doc_url: https://github.com/blockresearchgroup/compas_shapeop
+          persist-credentials: false
+      - uses: compas-dev/compas-actions/setup-python@5c64e6e2b576a1232d28fed47d9478ca8eb63b2d # v2 candidate
+        with:
+          python-version: "3.12"
+          dependency-groups: docs
+          extras: ""
+      - run: uv run mkdocs build --strict
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docs-candidate
+          path: site
+          if-no-files-found: error

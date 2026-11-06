@@ -1,28 +1,29 @@
 # COMPAS ShapeOp
 
-COMPAS bindings for ShapeOp
+COMPAS ShapeOp provides Python bindings and COMPAS convenience APIs for the
+[ShapeOp](https://www.shapeop.org/) geometry-processing solver.
 
 ## Installation
 
-Stable releases can be installed from PyPI.
+COMPAS ShapeOp requires Python 3.12 or newer.
 
 ```bash
-pip install compas_shapeop
+python -m pip install compas_shapeop
 ```
 
-To install the latest version for development, do:
+## Development
+
+The repository uses a locked `uv` environment and thin Invoke aliases:
 
 ```bash
-git clone https://github.com/blockresearchgroup/compas_shapeop.git
-cd compas_shapeop
-pip install --no-build-isolation -ve .  -Ceditable.rebuild=true
+uv sync --all-groups
+uv run invoke test
+uv run invoke lint
+uv run invoke typecheck
+uv run invoke docs
 ```
 
-## Documentation
-
-For further "getting started" instructions, a tutorial, examples, and an API reference,
-please check out the online documentation here: [COMPAS ShapeOp docs](https://blockresearchgroup.github.io/compas_shapeop)
-
-## Issue Tracker
-
-If you find a bug or if you have a problem with running the code, please file an issue on the [Issue Tracker](https://github.com/blockresearchgroup/compas_shapeop/issues).
+See the [documentation](https://compas-dev.github.io/compas_shapeop/) for the
+tutorial, examples, API reference, numerical limitations, and source-build
+requirements. Report problems in the
+[issue tracker](https://github.com/compas-dev/compas_shapeop/issues).

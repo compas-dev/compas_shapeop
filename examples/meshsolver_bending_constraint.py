@@ -1,11 +1,11 @@
-from compas.datastructures import Mesh
 from compas_viewer import Viewer
 
+from compas.datastructures import Mesh
 from compas_shapeop.meshsolver import MeshSolver
 
 mesh = Mesh.from_meshgrid(10, 8, 10, 8)
 mesh.translate([-5, -5, 0])
-mesh.quads_to_triangles()
+mesh = mesh.triangulated()
 
 s = MeshSolver(mesh)
 s.fix_vertices(vertices=mesh.vertices_where({"vertex_degree": 3}))
@@ -18,7 +18,7 @@ mesh_obj = viewer.scene.add(s.mesh)
 
 
 @viewer.on(interval=1)
-def update(frame):
+def update(frame: int) -> None:
     s.solve(1)
     mesh_obj.update(update_data=True)
 

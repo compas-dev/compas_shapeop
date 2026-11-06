@@ -1,12 +1,12 @@
 import pathlib
 
-import compas
-from compas.datastructures import Mesh
 from compas_viewer import Viewer
 
+from compas.data import json_load
+from compas.datastructures import Mesh
 from compas_shapeop.meshsolver import MeshSolver
 
-mesh = compas.json_load(pathlib.Path(__file__).parent.parent / "data/hex_mesh.json")
+mesh = json_load(pathlib.Path(__file__).parent.parent / "data/hex_mesh.json")
 mesh = Mesh.from_polygons(mesh.to_polygons())
 mesh.weld()
 mesh.scale(8.5)
@@ -24,7 +24,7 @@ mesh_obj = viewer.scene.add(s.mesh)
 
 
 @viewer.on(interval=1)
-def update(frame):
+def update(frame: int) -> None:
     s.solve(1)
     mesh_obj.update(update_data=True)
 

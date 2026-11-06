@@ -1,12 +1,15 @@
-from typing import List
-from typing import Optional
-from typing import Union
+from collections.abc import Sequence
 
 import numpy as np
+from numpy.typing import ArrayLike
+from numpy.typing import NDArray
 
 from compas.datastructures import Mesh
+from compas.typing import RealInput
 
 from ._shapeop import SolverWrapper
+
+type PointsInput = NDArray[np.float64] | Sequence[Sequence[float]]
 
 
 class Solver:
@@ -39,7 +42,10 @@ class Solver:
     Attributes
     ----------
     points : numpy.ndarray
-        Direct reference to the solver's points matrix in shape (n, 3).
+        Direct reference to the initialized solver's points matrix in shape
+        `(n, 3)`, or `None` before initialization. Assigning new points resets
+        the native solver, including its constraints and forces, and requires
+        another call to `init()`.
     """
 
     def __init__(self) -> None:
@@ -49,17 +55,19 @@ class Solver:
         memory sharing between C++ and Python.
         """
         self._solver = SolverWrapper()
-        self._points: Optional[np.ndarray] = None  # Direct reference to ShapeOp's points matrix
+        self._points: NDArray[np.float64] | None = None
+        self._retired_solvers: list[SolverWrapper] = []
+        self.is_initialized: bool = False
 
     @property
-    def points(self) -> Optional[np.ndarray]:
+    def points(self) -> NDArray[np.float64] | None:
         return self._points
 
     @points.setter
-    def points(self, points: Union[np.ndarray, List[List[float]]]) -> None:
+    def points(self, points: PointsInput) -> None:
         self._set_points(points)
 
-    def _set_points(self, points: Union[np.ndarray, List[List[float]]]) -> None:
+    def _set_points(self, points: PointsInput) -> None:
         """Set the vertex positions in the solver.
 
         This method initializes the solver's internal memory with the
@@ -75,18 +83,26 @@ class Solver:
         # Convert any input to a numpy array first
         if not isinstance(points, np.ndarray):
             # Convert list of points to numpy array
-            points_array: np.ndarray = np.array(points, dtype=np.float64)
+            points_array = np.array(points, dtype=np.float64)
         else:
-            points_array: np.ndarray = points
+            points_array = points
 
         # Make sure array has the right shape (n, 3)
         if not (len(points_array.shape) == 2 and points_array.shape[1] == 3):
             raise ValueError(f"Points must have shape (n, 3), got {points_array.shape}")
 
         # Convert to (3, n) Fortran-ordered array for efficient transfer to C++
-        fortran_points: np.ndarray = np.asfortranarray(points_array.T)
-        # Use the optimized array-based method
+        fortran_points = np.asfortranarray(points_array.T)
+
+        # Point count changes can invalidate constraints, forces, and exported
+        # views. A fresh wrapper gives reassignment one explicit lifecycle: add
+        # constraints and forces again, then initialize again.
+        if self._points is not None:
+            self._retired_solvers.append(self._solver)
+        self._solver = SolverWrapper()
         self._solver.set_points(fortran_points)
+        self._points = None
+        self.is_initialized = False
 
     def init(self, dynamic: bool = False, masses: float = 1.0, damping: float = 1.0, timestep: float = 1.0) -> None:
         """Initialize the solver with simulation parameters.
@@ -107,6 +123,7 @@ class Solver:
         # Set up the direct view after initialization when memory is fully prepared
         if result:
             self._points = self._solver.get_points().T
+            self.is_initialized = True
         else:
             print("Failed to initialize solver")
 
@@ -124,7 +141,7 @@ class Solver:
     # CONSTRAINTS
     # ==========================================================================
 
-    def add_closeness_constraint(self, index: int, weight: float = 1e5) -> int:
+    def add_closeness_constraint(self, index: int, weight: float = 1e5) -> bool:
         """Add a closeness constraint to the solver.
 
         A closeness constraint tries to keep vertices close to their
@@ -139,12 +156,12 @@ class Solver:
 
         Returns
         -------
-        int
-            ID of the added constraint.
+        bool
+            Native wrapper status for the constraint operation.
         """
         return self._solver.add_closeness_constraint(index, weight)
 
-    def add_closeness_constraints(self, vertices: List[int], weight: float = 1e5) -> None:
+    def add_closeness_constraints(self, vertices: Sequence[int], weight: float = 1e5) -> list[bool]:
         """Add closeness constraints to multiple vertices.
 
         Parameters
@@ -154,13 +171,13 @@ class Solver:
         weight : float, optional
             Weight of the constraints. Default is 1e5.
         """
-        constraint_ids: List[int] = []
+        constraint_ids: list[bool] = []
         for vertex in vertices:
-            constraint_id: int = self.add_closeness_constraint(vertex, weight)
+            constraint_id = self.add_closeness_constraint(vertex, weight)
             constraint_ids.append(constraint_id)
         return constraint_ids
 
-    def add_closeness_constraint_with_position(self, index: int, weight: float, x: float, y: float, z: float) -> int:
+    def add_closeness_constraint_with_position(self, index: int, weight: float, x: RealInput, y: RealInput, z: RealInput) -> bool:
         """Add a closeness constraint at a specific xyz coordinate.
 
         A closeness constraint that keeps vertices close to a specified target position
@@ -182,12 +199,12 @@ class Solver:
 
         Returns
         -------
-        int
-            ID of the added constraint.
+        bool
+            Native wrapper status for the constraint operation.
         """
         return self._solver.add_closeness_constraint_with_position(index, weight, x, y, z)
 
-    def add_edge_strain_constraint(self, start_vertex: int, end_vertex: int, weight: float = 1.0, min_range: float = 0.9, max_range: float = 1.1) -> int:
+    def add_edge_strain_constraint(self, start_vertex: int, end_vertex: int, weight: float = 1.0, min_range: float = 0.9, max_range: float = 1.1) -> bool:
         """Add an edge strain constraint between two specific vertices.
 
         An edge strain constraint tries to keep the distance between two vertices
@@ -210,12 +227,12 @@ class Solver:
 
         Returns
         -------
-        int
-            ID of the added constraint.
+        bool
+            Native wrapper status for the constraint operation.
         """
         return self._solver.add_edge_strain_constraint(start_vertex, end_vertex, weight, min_range, max_range)
 
-    def add_shrinking_edge_constraint(self, start_vertex: int, end_vertex: int, weight: float = 1.0, shrink_factor: float = 0.25) -> int:
+    def add_shrinking_edge_constraint(self, start_vertex: int, end_vertex: int, weight: float = 1.0, shrink_factor: float = 0.25) -> bool:
         """Add a shrinking edge constraint to the solver.
 
         A shrinking edge constraint tries to shrink the edge length by a specified factor.
@@ -231,17 +248,18 @@ class Solver:
         weight : float, optional
             Weight of the constraint. Higher values make the constraint stronger.
         shrink_factor : float, optional
-            Target shrinking factor (default=0.25). The target length will be
-            (1.0 - shrink_factor) times the original length.
+            Target length as a ratio of the original length. The accepted range
+            is `shrink_factor - 0.05` to `shrink_factor + 0.05`. Default is
+            `0.25`.
 
         Returns
         -------
-        int
-            ID of the added constraint.
+        bool
+            Native wrapper status for the constraint operation.
         """
         return self._solver.add_shrinking_edge_constraint(start_vertex, end_vertex, weight, shrink_factor)
 
-    def add_circle_constraint(self, indices: List[int], weight: float = 1.0) -> bool:
+    def add_circle_constraint(self, indices: Sequence[int], weight: float = 1.0) -> bool:
         """Add circle constraint to make vertices lie on a circle.
 
         Parameters
@@ -258,7 +276,7 @@ class Solver:
         """
         return self._solver.add_circle_constraint(indices, weight)
 
-    def add_plane_constraint(self, indices: List[int], weight: float = 1.0) -> int:
+    def add_plane_constraint(self, indices: Sequence[int], weight: float = 1.0) -> bool:
         """Add a plane constraint to the solver.
 
         A plane constraint tries to keep points co-planar.
@@ -273,12 +291,12 @@ class Solver:
 
         Returns
         -------
-        int
-            ID of the added constraint.
+        bool
+            Native wrapper status for the constraint operation.
         """
         return self._solver.add_plane_constraint(indices, weight)
 
-    def add_bending_constraint(self, indices: List[int], weight: float = 1.0, min_range: float = 1.0, max_range: float = 1.0) -> int:
+    def add_bending_constraint(self, indices: Sequence[int], weight: float = 1.0, min_range: float = 1.0, max_range: float = 1.0) -> bool:
         """Add a bending constraint between two neighboring triangles.
 
         Parameters
@@ -294,12 +312,19 @@ class Solver:
 
         Returns
         -------
-        int
-            ID of the added constraint.
+        bool
+            Native wrapper status for the constraint operation.
         """
         return self._solver.add_bending_constraint(indices, weight, min_range, max_range)
 
-    def add_similarity_constraint(self, indices: List[int], weight: float = 1.0, allow_scaling: bool = True, allow_rotation: bool = True, allow_translation: bool = True) -> bool:
+    def add_similarity_constraint(
+        self,
+        indices: Sequence[int],
+        weight: float = 1.0,
+        allow_scaling: bool = True,
+        allow_rotation: bool = True,
+        allow_translation: bool = True,
+    ) -> bool:
         """Add similarity constraint to transform vertices to match a target shape.
 
         This is a low-level method that creates a similarity constraint. You must
@@ -327,7 +352,7 @@ class Solver:
         """
         return self._solver.add_similarity_constraint(indices, weight, allow_scaling, allow_rotation, allow_translation)
 
-    def add_regular_polygon_constraint(self, indices: List[int], weight: float = 1.0) -> bool:
+    def add_regular_polygon_constraint(self, indices: Sequence[int], weight: float = 1.0) -> bool:
         """Add constraint to make vertices form a regular polygon.
 
         This is a high-level method that automatically:
@@ -348,7 +373,7 @@ class Solver:
         """
         return self._solver.add_regular_polygon_constraint(indices, weight)
 
-    def add_normal_force_with_faces(self, faces_flat: Union[List[int], np.ndarray], face_sizes: Union[List[int], np.ndarray], magnitude: float = 1.0) -> bool:
+    def add_normal_force_with_faces(self, faces_flat: ArrayLike, face_sizes: ArrayLike, magnitude: float = 1.0) -> bool:
         """Add a normal force (inflation) using custom face topology.
 
         This applies forces along face normals, causing inflation or deflation
@@ -371,11 +396,11 @@ class Solver:
             True if the force was added successfully.
         """
 
-        faces_flat_array: np.ndarray = np.asarray(faces_flat, dtype=np.int32)
-        face_sizes_array: np.ndarray = np.asarray(face_sizes, dtype=np.int32)
+        faces_flat_array = np.asarray(faces_flat, dtype=np.int32)
+        face_sizes_array = np.asarray(face_sizes, dtype=np.int32)
         return self._solver.add_normal_force_with_faces(faces_flat_array, face_sizes_array, magnitude)
 
-    def add_vertex_force(self, index: int, force_x: float = 0.0, force_y: float = 0.0, force_z: float = 0.0) -> int:
+    def add_vertex_force(self, index: int, force_x: float = 0.0, force_y: float = 0.0, force_z: float = 0.0) -> bool:
         """Add a vertex force to a specific point.
 
         Parameters
@@ -391,12 +416,12 @@ class Solver:
 
         Returns
         -------
-        int
-            ID of the added force.
+        bool
+            Native wrapper status for the force operation.
         """
         return self._solver.add_vertex_force(force_x, force_y, force_z, index)
 
-    def add_gravity_force(self, fx: float = 0.0, fy: float = 0.0, fz: float = -0.001) -> int:
+    def add_gravity_force(self, fx: float = 0.0, fy: float = 0.0, fz: float = -0.001) -> bool:
         """Add a gravity force to all vertices in the system.
 
         Parameters
@@ -410,17 +435,17 @@ class Solver:
 
         Returns
         -------
-        int
-            ID of the added force.
+        bool
+            Native wrapper status for the force operation.
         """
         return self._solver.add_gravity_force(fx, fy, fz)
 
-    def add_mesh_vertex_force(self, mesh: Mesh, force_x: float = 0.0, force_y: float = 0.0, force_z: float = 0.0, exclude_vertices: Optional[List[int]] = None) -> List[int]:
+    def add_mesh_vertex_force(self, mesh: Mesh, force_x: float = 0.0, force_y: float = 0.0, force_z: float = 0.0, exclude_vertices: Sequence[int] | None = None) -> list[bool]:
         """Add vertex forces to all vertices of a COMPAS mesh.
 
         Parameters
         ----------
-        mesh : :class:`compas.datastructures.Mesh`
+        mesh : Mesh
             The COMPAS mesh to add forces to.
         force_x : float, optional
             X component of the force vector. Default is 0.0.
@@ -433,29 +458,29 @@ class Solver:
 
         Returns
         -------
-        list
-            IDs of all added forces.
+        list[bool]
+            Native wrapper statuses for the force operations.
         """
         exclude_vertices = exclude_vertices or []
-        force_ids: List[int] = []
+        force_ids: list[bool] = []
 
-        for vertex in mesh.vertices():
+        for index, vertex in enumerate(mesh.vertices()):
             if vertex not in exclude_vertices:
-                fid: int = self.add_vertex_force(vertex, force_x, force_y, force_z)
+                fid = self.add_vertex_force(index, force_x, force_y, force_z)
                 force_ids.append(fid)
 
         return force_ids
 
     def add_shape_constraint(
         self,
-        indices: List[int],
+        indices: Sequence[int],
         shape_type: str = "regular_polygon",
         weight: float = 1.0,
         allow_scaling: bool = True,
         allow_rotation: bool = True,
         allow_translation: bool = True,
-        custom_points: Optional[List[List[float]]] = None,
-    ) -> int:
+        custom_points: Sequence[Sequence[float]] | None = None,
+    ) -> bool:
         """Add a unified shape constraint with different shape types.
 
         This consolidates functionality of add_regular_polygon_constraint,
@@ -481,12 +506,12 @@ class Solver:
 
         Returns
         -------
-        int
-            ID of the constraint if successful, 0 otherwise.
+        bool
+            Native wrapper status for the constraint operation.
         """
         if shape_type == "custom" and custom_points is None:
             raise ValueError("custom_points is required when shape_type='custom'")
 
-        points_to_use: List[List[float]] = custom_points or []
+        points_to_use: Sequence[Sequence[float]] = custom_points if custom_points is not None else ()
 
         return self._solver.add_shape_constraint(indices, shape_type, weight, allow_scaling, allow_rotation, allow_translation, points_to_use)

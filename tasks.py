@@ -1,35 +1,46 @@
-from __future__ import print_function
+"""Thin Invoke aliases for the repository's canonical development commands."""
 
-import os
+from invoke import task
 
-from compas_invocations2 import build
-from compas_invocations2 import docs
-from compas_invocations2 import style
-from compas_invocations2 import tests
-from invoke import Collection
 
-ns = Collection(
-    docs.help,
-    style.check,
-    style.lint,
-    style.format,
-    docs.docs,
-    docs.linkcheck,
-    tests.test,
-    tests.testdocs,
-    tests.testcodeblocks,
-    build.prepare_changelog,
-    build.clean,
-    build.release,
-    build.build_ghuser_components,
-)
-ns.configure(
-    {
-        "base_folder": os.path.dirname(__file__),
-        "ghuser": {
-            "source_dir": "src/compas_shapeop_ghpython/components",
-            "target_dir": "src/compas_shapeop_ghpython/components/ghuser",
-            "prefix": "compas_shapeop: ",
-        },
-    }
-)
+@task
+def test(context):
+    """Run the test suite."""
+    context.run("python -m pytest")
+
+
+@task
+def lint(context):
+    """Run Ruff lint checks."""
+    context.run("python -m ruff check .")
+
+
+@task
+def format(context, check=False):
+    """Format Python sources, or check formatting with `--check`."""
+    suffix = " --check" if check else ""
+    context.run(f"python -m ruff format .{suffix}")
+
+
+@task
+def typecheck(context):
+    """Run Pyright."""
+    context.run("python -m pyright")
+
+
+@task
+def docs(context):
+    """Build the documentation in strict mode."""
+    context.run("python -m mkdocs build --strict")
+
+
+@task
+def build(context):
+    """Build the source and wheel distributions."""
+    context.run("python -m build")
+
+
+@task
+def clean(context):
+    """Remove generated build artifacts."""
+    context.run("git clean -fdX build dist site")

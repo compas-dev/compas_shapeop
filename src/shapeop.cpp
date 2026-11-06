@@ -143,7 +143,7 @@ public:
         auto constraint = std::make_shared<ShapeOp::ClosenessConstraint>(
             indices_vec, weight, solver->getPoints());
         
-        return solver->addConstraint(constraint) > 0;
+        return solver->addConstraint(constraint) >= 0;
     }
     
     /**
@@ -177,7 +177,7 @@ public:
         constraint->setPosition(pos);
         
         // Add constraint to solver
-        return solver->addConstraint(constraint) > 0;
+        return solver->addConstraint(constraint) >= 0;
     }
     
     /**
@@ -199,7 +199,7 @@ public:
         auto constraint = std::make_shared<ShapeOp::EdgeStrainConstraint>(
             indices_vec, weight, solver->getPoints(), min_range, max_range);
         
-        return solver->addConstraint(constraint) > 0;
+        return solver->addConstraint(constraint) >= 0;
     }
     
     /**
@@ -207,7 +207,7 @@ public:
      * @param vertex_index1 First vertex index
      * @param vertex_index2 Second vertex index
      * @param weight Weight of the constraint
-     * @param shrink_factor Shrink factor of the constraint
+     * @param shrink_factor Target edge length as a ratio of the original length
      * @return true if constraint is added successfully
      */
     bool add_shrinking_edge_constraint(int vertex_index1, int vertex_index2, double weight, double shrink_factor) {
@@ -224,7 +224,7 @@ public:
         auto constraint = std::make_shared<ShapeOp::EdgeStrainConstraint>(
             indices_vec, weight, solver->getPoints(), min_range, max_range);
         
-        return solver->addConstraint(constraint) > 0;
+        return solver->addConstraint(constraint) >= 0;
     }
     
     /**
@@ -246,7 +246,7 @@ public:
         auto constraint = std::make_shared<ShapeOp::CircleConstraint>(
             indices, weight, solver->getPoints());
         
-        return solver->addConstraint(constraint) > 0;
+        return solver->addConstraint(constraint) >= 0;
     }
     
     /**
@@ -267,7 +267,7 @@ public:
 
         // Create the constraint
         auto constraint = std::make_shared<ShapeOp::PlaneConstraint>(indices, weight, solver->getPoints());
-        return solver->addConstraint(constraint) > 0;
+        return solver->addConstraint(constraint) >= 0;
     }
     
     /**
@@ -290,7 +290,7 @@ public:
             indices, weight, solver->getPoints(), 
             allow_scaling, allow_rotation, allow_translation);
         
-        return solver->addConstraint(constraint) > 0;
+        return solver->addConstraint(constraint) >= 0;
     }
     
     /**
@@ -349,7 +349,62 @@ public:
         shapes.push_back(shape);
         constraint->setShapes(shapes);
         
-        return solver->addConstraint(constraint) > 0;
+        return solver->addConstraint(constraint) >= 0;
+    }
+
+    /**
+     * @brief Add a regular-polygon, similarity, or custom shape constraint
+     * @param indices Vector of vertex indices
+     * @param shape_type One of regular_polygon, similarity, or custom
+     * @param weight Weight of the constraint
+     * @param allow_scaling Whether the shape may scale
+     * @param allow_rotation Whether cyclic vertex rotations are considered
+     * @param allow_translation Whether flipped vertex order is considered
+     * @param custom_points Custom target points for a custom shape
+     * @return true if the constraint is added successfully
+     */
+    bool add_shape_constraint(std::vector<int> indices,
+                              const std::string& shape_type,
+                              double weight,
+                              bool allow_scaling,
+                              bool allow_rotation,
+                              bool allow_translation,
+                              const std::vector<std::vector<double>>& custom_points) {
+        if (!is_valid()) {
+            return false;
+        }
+
+        if (shape_type == "regular_polygon") {
+            return add_regular_polygon_constraint(indices, weight);
+        }
+        if (shape_type != "similarity" && shape_type != "custom") {
+            throw std::runtime_error("Shape type must be 'regular_polygon', 'similarity', or 'custom'");
+        }
+        if (indices.size() < 2) {
+            throw std::runtime_error("Shape constraints require at least 2 vertices");
+        }
+
+        auto constraint = std::make_shared<ShapeOp::SimilarityConstraint>(
+            indices, weight, solver->getPoints(), allow_scaling, allow_rotation, allow_translation);
+
+        if (shape_type == "custom") {
+            if (custom_points.size() != indices.size()) {
+                throw std::runtime_error("Custom shape point count must match the vertex index count");
+            }
+
+            ShapeOp::Matrix3X shape(3, custom_points.size());
+            for (size_t i = 0; i < custom_points.size(); ++i) {
+                if (custom_points[i].size() != 3) {
+                    throw std::runtime_error("Custom shape points must have exactly 3 coordinates");
+                }
+                shape(0, i) = custom_points[i][0];
+                shape(1, i) = custom_points[i][1];
+                shape(2, i) = custom_points[i][2];
+            }
+            constraint->setShapes({shape});
+        }
+
+        return solver->addConstraint(constraint) >= 0;
     }
 
     /**
@@ -379,7 +434,7 @@ public:
         auto constraint = std::make_shared<ShapeOp::BendingConstraint>(
             indices, weight, solver->getPoints(), min_range, max_range);
         
-        return solver->addConstraint(constraint) > 0;
+        return solver->addConstraint(constraint) >= 0;
     }
 
     /**
@@ -500,6 +555,7 @@ NB_MODULE(_shapeop, m) {
         .def("add_plane_constraint", &SolverWrapper::add_plane_constraint)
         .def("add_similarity_constraint", &SolverWrapper::add_similarity_constraint)
         .def("add_regular_polygon_constraint", &SolverWrapper::add_regular_polygon_constraint)
+        .def("add_shape_constraint", &SolverWrapper::add_shape_constraint)
         .def("add_bending_constraint", &SolverWrapper::add_bending_constraint)
         .def("add_normal_force_with_faces", &SolverWrapper::add_normal_force_with_faces)
         .def("add_vertex_force", &SolverWrapper::add_vertex_force)

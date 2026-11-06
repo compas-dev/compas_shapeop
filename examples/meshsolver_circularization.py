@@ -1,8 +1,8 @@
+from compas_viewer import Viewer
+
 from compas.colors import Color
 from compas.datastructures import Mesh
 from compas.geometry import Circle
-from compas_viewer import Viewer
-
 from compas_shapeop.meshsolver import MeshSolver
 
 mesh = Mesh.from_meshgrid(10, 8, 10, 8)

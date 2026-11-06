@@ -9,9 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* Stable-ABI native wheels for Python 3.12 through 3.14.
+* Typed-package marker and private native binding stub.
+* Strict MkDocs documentation and numerical solver regression tests.
+
 ### Changed
 
+* Raised the minimum Python version to 3.12 and adopted locked `uv` development workflows.
+* Made native dependencies reproducible with checksum-verified Eigen 3.4.0 and explicit bundled ShapeOp notices.
+* Modernized CMake target configuration and disabled optional OpenMP by default.
+
 ### Removed
+
+* Removed the obsolete Sphinx and requirements-file development configuration.
 
 
 ## [0.1.2] 2025-05-09

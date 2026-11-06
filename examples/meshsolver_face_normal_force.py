@@ -14,7 +14,7 @@ mesh_obj = viewer.scene.add(s.mesh)
 
 
 @viewer.on(interval=1)
-def update(frame):
+def update(frame: int) -> None:
     s.solve(1)
     mesh_obj.update(update_data=True)
 

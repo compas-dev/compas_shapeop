@@ -1,6 +1,7 @@
-from compas.datastructures import Mesh
 from compas_viewer import Viewer
 
+from compas.datastructures import Mesh
+from compas.typing import PointLike
 from compas_shapeop.meshsolver import MeshSolver
 
 mesh = Mesh.from_meshgrid(10.0, 10, 10.0, 10)
@@ -9,7 +10,7 @@ mesh.translate([-5, -5, 0])
 v = list(mesh.vertices_where({"vertex_degree": 2}))
 p = mesh.vertices_attributes(keys=v, names="xyz")
 
-t = [
+t: list[PointLike] = [
     [p[0][0], p[0][1], 3],
     [p[1][0], p[1][1], 5],
     [p[2][0], p[2][1], 5],

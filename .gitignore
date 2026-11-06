@@ -138,6 +138,8 @@ src/.build/**
 docs/api/generated/
 
 scripts/
+!.github/scripts/
+!.github/scripts/*.py
 
 .ruff_cache
 
